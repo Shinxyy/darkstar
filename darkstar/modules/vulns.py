@@ -34,16 +34,34 @@ class CVE:
 
 
 class Vulnerability():
-    def __init__(self, title, affected_item, tool, confidence, severity, host, cve_number=None, summary=None, impact=None, solution=None, poc=None, references=None, epss=None, cvss=None, cwe=None, capec=None):
+    def __init__(self, title, affected_item, tool, confidence, severity, host,
+                 cve_number="", summary="", impact="", solution="", poc="",
+                 references="", epss=None, cvss=None, cwe="", capec=""):
         self.title = title
         self.affected_item = affected_item
         self.tool = tool
         self.confidence = confidence
         self.severity = severity
         self.host = host
-        if cve_number != None:
-            self.cve = self.cve_enricher(cve_number)
+
+        # Use truthiness to decide whether to attempt CVE enrichment.
+        if cve_number:  # This evaluates to False for an empty string.
+            enriched = self.cve_enricher(cve_number)
+            if enriched:
+                self.cve = enriched
+            else:
+                # Optionally, you can set non-CVE attributes here as well
+                self.summary = summary
+                self.impact = impact
+                self.solution = solution
+                self.poc = poc
+                self.references = references
+                self.epss = epss
+                self.cvss = cvss
+                self.cwe = cwe
+                self.capec = capec
         else:
+            # No valid CVE provided: assign non-CVE attributes.
             self.summary = summary
             self.impact = impact
             self.solution = solution

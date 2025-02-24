@@ -1,7 +1,23 @@
 #!/bin/bash
 
+#? Create .env file
+echo '#? Database 
+DB_USER=
+DB_PASSWORD=
+#? Production
+DB_HOST=mariadb
+DB_NAME=test
+
+#? HIBP
+HIBP_KEY=
+
+#? OpenVAS
+OPENVAS_USER=
+OPENVAS_PASSWORD=' > ./darkstar/.env
+
+
 #? Setup the docker 
-echo '[+] Building the pwnpatrol docker with all the tools inside'
+echo '[+] Building the Darkstar docker with all the tools inside'
 docker compose -f docker-compose.yaml up -d --build
 
 #? Setup openvas docker
@@ -17,4 +33,4 @@ sleep 5
 clear
 
 echo '[+] Starting interactive shell inside the container'
-docker exec -it pwnpatrol /bin/bash
+docker exec -it darkstar /bin/bash

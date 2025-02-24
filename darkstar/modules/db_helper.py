@@ -163,44 +163,45 @@ def prepare_non_cve_data(vuln):
     return non_cve_data
 
 def insert_vulnerability_to_database(vuln: Vulnerability, org_name: str):
-    # Establish the database connection
-    connection = mysql.connector.connect(**db_config)
-    
-    if connection.is_connected():
-        cursor = connection.cursor()
-        cursor.execute(f"USE {org_name}")
-        # Define the INSERT query
-        insert_query = """
-        INSERT INTO Vulnerability (
-            cve, title, affected_item, tool, confidence, severity, host,
-            cvss, epss, summary, cwe, `references`, capec, solution, impact,
-            access, age, pocs, kev
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """
+    try:
+        # Establish the database connection
+        connection = mysql.connector.connect(**db_config)
         
-        # Check if the vulnerability has a CVE
-        if hasattr(vuln, 'cve') and vuln.cve is not None:
-            # Prepare CVE-based data
-            cve_data = prepare_cve_data(vuln)
-            cursor.execute(insert_query, cve_data)
-        else:
-            # Prepare non-CVE-based data
-            non_cve_data = prepare_non_cve_data(vuln)
-            cursor.execute(insert_query, non_cve_data)
+        if connection.is_connected():
+            cursor = connection.cursor()
+            cursor.execute(f"USE {org_name}")
+            # Define the INSERT query
+            insert_query = """
+            INSERT INTO vulnerability (
+                cve, title, affected_item, tool, confidence, severity, host,
+                cvss, epss, summary, cwe, `references`, capec, solution, impact,
+                access, age, pocs, kev
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            
+            # Check if the vulnerability has a CVE
+            if hasattr(vuln, 'cve') and vuln.cve is not None:
+                # Prepare CVE-based data
+                cve_data = prepare_cve_data(vuln)
+                cursor.execute(insert_query, cve_data)
+            else:
+                # Prepare non-CVE-based data
+                non_cve_data = prepare_non_cve_data(vuln)
+                cursor.execute(insert_query, non_cve_data)
 
-        # Commit the transaction
-        connection.commit()
-        print("[+] Vulnerability inserted successfully into database.")
+            # Commit the transaction
+            connection.commit()
+            print("[+] Vulnerability inserted successfully into database.")
 
-    # except mysql.connector.Error as e:
-    #     print(f"[-] MySQL Error: {e}")
-    # except Exception as e:
-    #     print(f"[-] General Error: {e}")
-    # finally:
-    #     if connection.is_connected():
-    #         cursor.close()
-    #         connection.close()
-    #         print("[+] Closed the MySQL connection.")
+    except mysql.connector.Error as e:
+        print(f"[-] MySQL Error: {e}")
+    except Exception as e:
+        print(f"[-] General Error: {e}")
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+            print("[+] Closed the MySQL connection.")
 
 
 # Insert an email into the SQL output database

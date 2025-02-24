@@ -46,12 +46,11 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 #? Install Nuclei and bbot
 RUN pipx install bbot
 RUN echo 'export PATH=$PATH:/root/.local/bin' >> ~/.bashrc
-# RUN source ~/.bashrc
 
 RUN /usr/local/go/bin/go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
 RUN echo 'export PATH=$PATH:/root/go/bin/' >> ~/.bashrc
-# RUN source ~/.bashrc
+
 # Directly clone the wordpress templates from wordfence
-RUN export GITHUB_TEMPLATE_REPO=topscoder/nuclei-wordfence-cve && /root/go/bin/nuclei -update-templates
+RUN export GITHUB_TEMPLATE_REPO=topscoder/nuclei-wordfence-cve; /root/go/bin/nuclei -update-templates
 
 CMD ["/bin/bash", "-c", "source /etc/bash.bashrc && tail -f /dev/null"]

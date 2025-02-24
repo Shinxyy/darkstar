@@ -32,7 +32,7 @@ class bbot():
                     item = eval(item)
                 severity = "info" if row["Event type"] == "FINDING" else item.get("severity", None)
                 finding_object = Vulnerability(
-                    title=item.get("description", None),
+                    title='asm finding',
                     affected_item=item.get("url", None),
                     tool="bbot",
                     confidence=90,
@@ -102,8 +102,9 @@ class bbot():
         insert_bbot_to_db(self.prep_data(), org_name=self.org_name)
 
 class nuclei():
-    def __init__(self, filename: str):
+    def __init__(self, filename: str, org_name: str):
         self.file = filename
+        self.org_name = org_name
 
     def scan_nuclei(self) -> None:
         keywords = ["unknown", "low", "medium", "high", "critical"]
@@ -225,6 +226,133 @@ class nuclei():
     def run(self) -> None:     
         thread = threading.Thread(target=self.scan_nuclei)
         thread.start()
+
+class nuclei_wordpress():
+    def __init__(self, domains: str, org_name: str):
+        self.domains = domains
+        self.org_name = org_name
+
+    def scan_nuclei(self) -> None:
+        keywords = ["unknown", "low", "medium", "high", "critical"]
+        #nuclei_command = f"nuclei -l domains.txt -s low,medium,high,critical,unknown -et github -bs 400 -rl 4000"
+        print(f"[+] Running Nuclei wordpress")
+        
+        nuclei_command = f"nuclei -u \"{self.domains}\" -s low,medium,high,critical,unknown -t github -bs 400 -rl 4000"
+        print(nuclei_command)
+        process = subprocess.Popen(nuclei_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1, universal_newlines=True)  
+        while True:  
+            output_line = process.stdout.readline()  
+            if not output_line and process.poll() is not None:  
+                break  
+
+            if output_line:     
+                if any(keyword in output_line for keyword in keywords):  
+                    print(f"Output Line: {output_line}")
+                    # extract url with regex
+                    url = ""
+                    try:
+                        url = re.search(r"(?P<url>https?://[^\s]+)", output_line).group("url")
+                    except:
+                        try:
+                            url = re.search(r"(?P<url>http?://[^\s]+)", output_line).group("url")
+                            #.group("url")
+                        except:
+                            #find it port based by x:443 or x:80
+                            url = re.search(r"(?P<url>[^\s]+:[0-9]+)", output_line).group("url")
+                            # cut off port
+                            url = url.split(":")[0]
+
+                    domain = url 
+                    # replace https:// http:// www.
+                    domain = domain.replace("https://", "")
+                    domain = domain.replace("http://", "")
+                    domain = domain.replace("www.", "")
+
+                    epss_percentile = None  
+
+
+                    # if has / in it, stop at /
+                    if "/" in domain:
+                        domain = domain.split("/")[0]
+
+                    # extract cve with regex
+                    cve = re.search(r"(?P<cve>CVE-[^\s]+)", output_line)
+                    #print(cve)
+
+                    # get first element of output line
+                    vuln = output_line.split(" ")[0]
+                    print(f"Raw vuln: {vuln}")
+
+                    pattern = re.compile(r'\[(?P<title>.*?)(?=-[0-9a-fA-F]+:version)\-[0-9a-fA-F]+:version\]')
+                    vuln = pattern.findall(vuln)
+                    
+                    if cve:
+                        cve = vuln
+                    
+                    vuln2 = vuln
+                    before = "Vulnerability found"
+                    # if the output line ends with a something inbetween []
+                    # get last part of output line
+                    last = output_line.split(" ")[-1]
+                    # remove enters or spaces at the end
+                    last = last.strip()
+                    # if last part of output line starts with [
+                    if last.endswith("]"):
+                        before = vuln 
+                        # strip last from color
+                        last = re.sub(r'\x1b[^m]*m', '', last)
+                        # strip last from ]
+                        last = last.split("]")[0]
+                        # replace vuln with last
+                        vuln2 = vuln
+                        vuln = last
+
+                    exploit = False
+                    epss = 0.0
+
+                    if cve:
+                        before = "CVE match found"
+                        # cut off at first :
+                        cve = cve.split(":")[0]
+                        # cut off at first ]
+                        cve = cve.split("]")[0]
+                        # remove colors from cve
+                        cve = re.sub(r'\x1b[^m]*m', '', cve)
+                        cve_number = cve
+                    else:
+                        cve_number = None
+                    # if unknown
+                    category = ""
+                    category2 = ""
+                    
+                    if "unknown" in output_line:
+                        category = "low"
+                        category2 = "unknown"
+                    elif "low" in output_line:
+                        category = "low"
+                        category2 = "low"
+                    elif "medium" in output_line:
+                        category = "medium"
+                        category2 = "medium"
+                    elif "high" in output_line:
+                        category = "high"
+                        category2 = "high"
+                    elif "critical" in output_line:
+                        category = "critical"
+                        category2 = "critical"
+
+                    print(f"Vuln: {vuln}, Vuln2: {vuln2}")
+                    finding_object = Vulnerability(vuln2, url, "nuclei_wordpress", 97, category, host=domain, cve_number=cve_number, epss=epss_percentile)
+
+                    #? add to database
+                    print(f"[+] Adding to database:\n{finding_object}")
+                    insert_vulnerability_to_database(vuln=finding_object, org_name=self.org_name)
+
+    #? Run the nuclei flow
+    def run(self) -> None:     
+        thread = threading.Thread(target=self.scan_nuclei)
+        thread.start()
+
 
 class nuclie_network():
     def __init__(self, worker):

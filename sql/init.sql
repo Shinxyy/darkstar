@@ -1,10 +1,7 @@
--- Step 2: Create the 'test' Database (if not exists)
 CREATE DATABASE IF NOT EXISTS test;
 
--- Use the 'test' Database
 USE test;
 
--- Step 3: Create the 'Vulnerability' Table
 CREATE TABLE IF NOT EXISTS Vulnerability (
     id INT(11) NOT NULL AUTO_INCREMENT,
     cve VARCHAR(255), -- CVE identifier (unique vulnerability ID)
@@ -29,7 +26,6 @@ CREATE TABLE IF NOT EXISTS Vulnerability (
     PRIMARY KEY (id)
 );
 
--- Step 4: Create the 'asmevents' Table
 CREATE TABLE IF NOT EXISTS asmevents (
     id INT(11) NOT NULL AUTO_INCREMENT, -- Unique identifier for the event
     event_type VARCHAR(50) DEFAULT NULL, -- Type of the event
@@ -42,7 +38,7 @@ CREATE TABLE IF NOT EXISTS asmevents (
     PRIMARY KEY (id) -- Set 'id' as the primary key
 );
 
-CREATE TABLE IF NOT EXISTS email_input (
+CREATE TABLE IF NOT EXISTS email_inputs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) NOT NULL
 );

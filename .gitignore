@@ -2,8 +2,7 @@ venv
 .venv
 .env
 env
-
-HIBPwnedKey.txt
+.env.*
 
 __pycache__
 

@@ -1,16 +1,16 @@
 from flask import Flask, request, jsonify
 import subprocess
 import xml.etree.ElementTree as ET
-import requests
+import time
 
 app = Flask(__name__)
-
+#TODO: Well the script is so insecure its almost like I want to build a backdoor all over the place ;)
+#TODO: Fix Command Injection vulns
 #? Create target
 @app.route('/create_target', methods=['POST'])
 def create_target():
     data = request.get_json()
     command = data['command']
-    print(command)
     
     #? Create target
     targetID = subprocess.getoutput(command)
@@ -20,6 +20,8 @@ def create_target():
     else:
         root = ET.fromstring(targetID)
         targetID = root.attrib['id']
+        print(f"targetid: {targetID}")
+        time.sleep(1)
         return jsonify({'message': targetID})
 
 
@@ -28,7 +30,6 @@ def create_target():
 def create_task():
     data = request.get_json()
     command = data['command']
-    print(command)
     
     #? Create task
     taskID = subprocess.getoutput(command)
@@ -38,7 +39,9 @@ def create_task():
     else:
         root = ET.fromstring(taskID)
         taskID = root.attrib['id']
-        return jsonify({'message': f"{taskID}"})
+        print(f"Taskid: {taskID}")
+        time.sleep(1)
+        return jsonify({'message': taskID})
 
 
 #? run_task
@@ -46,7 +49,6 @@ def create_task():
 def run_task():
     data = request.get_json()
     command = data['command']
-    print(command)
     
     #? Run task
     reportID = subprocess.getoutput(command)
@@ -54,10 +56,11 @@ def run_task():
     if 'Error' in reportID:
         return jsonify({'message': 'Failed to run task'})
     else:
+        
         reportID = reportID.split(">")[2].split("<")[0]
-        return jsonify({'message': command})
-
-
+        print(f"reportid: {reportID}")
+        time.sleep(1)
+        return jsonify({'message': reportID})
 
 #? check_if_finished
 @app.route('/check_if_finished', methods=['POST'])
@@ -68,30 +71,18 @@ def check_if_finished():
     
     #? Check if finished
     status = subprocess.getoutput(command)
-    
-    return jsonify({'message': status})
-
-
-#? wait_for_scan
-@app.route('/wait_for_scan', methods=['POST'])
-def wait_for_scan():
-    data = request.get_json()
-    command = data['command']
-    print(command)
-    
-    #? Wait for scan
-    status = subprocess.getoutput(command)
-    
+    print(f"Status: {status}")
     return jsonify({'message': status})
 
 #? get report
-@app.route('/get_report')
+@app.route('/get_report', methods=['POST'])
 def get_report():
-    data = requests.json()
+    data = request.get_json()
     command = data['command']
 
     report_data = subprocess.getoutput(command)
-
+    print(f"report data: {report_data}")
+    
     return jsonify({'message': report_data})
 
 
