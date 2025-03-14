@@ -30,6 +30,9 @@ OPENVAS_PASSWORD=${OPENVAS_PASSWORD}
 EOF
 fi
 
+# Enabling BuildKit for faster builds
+export DOCKER_BUILDKIT=1
+
 # Setup the docker
 echo '[+] Building the Darkstar docker with all the tools inside'
 docker compose -f docker-compose.yaml up -d --build

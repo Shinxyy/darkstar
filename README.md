@@ -37,6 +37,11 @@ Before installing, ensure you have the following tools:
 python3 main.py -t testphp.vulnweb.com,44.228.249.3 -m 2 -d test -env .env
 ```
 
+- To bruteforce default credential on known protocols (ftp, ssh, smtp, smb, snmp), you can specify `--bruteforce` flag and the mode to 3:
+```bash
+python3 main.py -t testphp.vulnweb.com -m 3 -d test --bruteforce
+```
+
 ## Datasets
 Darkstar leverages high quality threat intelligence sources:
 - [Epss Scores](https://www.first.org/epss/data_stats) – Probabilistic vulnerability prioritization

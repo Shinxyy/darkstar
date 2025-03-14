@@ -28,11 +28,7 @@ services:
     networks:
       - vuln_net
     volumes:
-      - ./darkstar/modules:/app/modules
-      - ./darkstar/datasets:/app/datasets
-      - ./darkstar/main.py:/app/main.py
-      - ./darkstar/c_scripts:/app/c_scripts
-      - ./darkstar/tests:/app/tests
+      - ./darkstar:/app
 
 volumes:
   mariadb_data:
