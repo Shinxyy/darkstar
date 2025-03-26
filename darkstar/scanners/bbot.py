@@ -153,7 +153,7 @@ class BBotScanner:
             )
             return pd.DataFrame()
 
-    def passive(self) -> None:
+    def attack_surface(self) -> None:
         """
         Run bbot with passive scanning flags.
 
@@ -168,7 +168,7 @@ class BBotScanner:
             "-t",
             self.target,
             "-f",
-            "safe,passive,subdomain-enum,cloud-enum,email-enum,social-enum,code-enum",
+            "safe,passive,subdomain-enum,cloud-enum,email-enum,social-enum,code-enum,web-basic,affiliates",
             "-o",
             self.folder,
             "-n",
@@ -194,6 +194,91 @@ class BBotScanner:
         insert_bbot_to_db(self.prep_data(), org_name=self.org_name)
         logger.info("Passive scan data successfully processed")
 
+
+    def passive(self) -> None:
+        """
+        Run bbot with passive scanning flags.
+
+        Executes a non-intrusive scan using bbot's passive modules,
+        focusing on subdomain enumeration and data collection without
+        active probing.
+        """
+        logger.info(f"Starting Passive bbot Scan on {self.target}")
+
+        command = [
+            "/root/.local/bin/bbot",
+            "-t",
+            self.target,
+            "-f",
+            "safe,passive,cloud-enum,email-enum,social-enum,code-enum",
+            "-o",
+            self.folder,
+            "-n",
+            self.foldername,
+            "-y",
+            "--strict-scope"
+        ]
+        logger.debug(f"Command: {' '.join(command)}")
+
+        process = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+        )
+
+        logger.info("bbot scan in progress...")
+        process.wait()
+        logger.info("Passive scan completed!")
+
+        # Place target name in the foldername
+        with open(f"{self.folder}/{self.foldername}/TARGET_NAME", "w") as target_file:
+            target_file.write(self.target)
+
+        # Store data from csv into the database
+        logger.info("Processing scan results and storing in database...")
+        insert_bbot_to_db(self.prep_data(), org_name=self.org_name)
+        logger.info("Passive scan data successfully processed")
+    
+    def normal(self) -> None:
+        """
+        Run bbot with normal scanning flags.
+
+        Executes a non-intrusive scan using bbot's normal modules,
+        focusing on subdomain enumeration and data collection without
+        active probing.
+        """
+        logger.info(f"Starting normal bbot Scan on {self.target}")
+
+        command = [
+            "/root/.local/bin/bbot",
+            "-t",
+            self.target,
+            "-f",
+            "cloud-enum,email-enum,social-enum,code-enum,web-basic",
+            "-o",
+            self.folder,
+            "-n",
+            self.foldername,
+            "-y",
+            "--strict-scope"
+        ]
+        logger.debug(f"Command: {' '.join(command)}")
+
+        process = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+        )
+
+        logger.info("bbot scan in progress...")
+        process.wait()
+        logger.info("normal scan completed!")
+
+        # Place target name in the foldername
+        with open(f"{self.folder}/{self.foldername}/TARGET_NAME", "w") as target_file:
+            target_file.write(self.target)
+
+        # Store data from csv into the database
+        logger.info("Processing scan results and storing in database...")
+        insert_bbot_to_db(self.prep_data(), org_name=self.org_name)
+        logger.info("normal scan data successfully processed")
+
     def aggressive(self) -> None:
         """
         Run bbot with aggressive scanning flags.
@@ -209,7 +294,7 @@ class BBotScanner:
             "-t",
             self.target,
             "-f",
-            "safe,passive,active,deadly,aggressive,web-thorough,subdomain-enum,cloud-enum,code-enum,affiliates",
+            "safe,passive,active,deadly,aggressive,web-thorough,cloud-enum,code-enum,affiliates",
             "-m",
             "nuclei,baddns,baddns_zone,dotnetnuke,ffuf",
             "--allow-deadly",
@@ -218,6 +303,7 @@ class BBotScanner:
             "-n",
             self.foldername,
             "-y",
+            "--strict-scope"
         ]
 
         logger.debug(f"Command: {' '.join(command)}")
@@ -240,14 +326,19 @@ class BBotScanner:
         insert_bbot_to_db(self.prep_data(), org_name=self.org_name)
         logger.info("Aggressive scan data successfully processed")
 
-    def run(self, aggressive_mode: bool = False) -> None:
+    def run(self, mode: str) -> int:
         """
         Run the appropriate bbot scan based on the mode.
 
         Args:
             aggressive_mode: If True, runs an aggressive scan, otherwise runs a passive scan
         """
-        if aggressive_mode:
+        if mode == "aggressive":
             self.aggressive()
+        elif mode == "normal":
+            self.normal()
+        elif mode == "attack_surface":
+            self.attack_surface()
         else:
             self.passive()
+        return 0

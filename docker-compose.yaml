@@ -11,10 +11,17 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
       - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - mariadb_data:/var/lib/mysql
     ports:
-      - "3306:3306"
+      - "3307:3306"  # Changed host port from 3306 to 3307 to avoid conflict
     networks:
       - vuln_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   darkstar:
     build:
@@ -23,12 +30,20 @@ services:
     container_name: darkstar
     env_file:
       - ./.env
+    ports:
+      - "8000:8000"  # Expose the application port (adjust to your app's actual port)
     depends_on:
-      - mariadb
+      mariadb:
+        condition: service_healthy
     networks:
       - vuln_net
     volumes:
       - ./darkstar:/app
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    # Add a command that keeps the container running
+    command: tail -f /dev/null
 
 volumes:
   mariadb_data:

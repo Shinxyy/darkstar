@@ -12,9 +12,11 @@ Configuration includes:
 
 from dotenv import load_dotenv
 import os
+import sys
 from colorama import Fore, Style, init
 from common.logger import setup_logger
 import logging
+import argparse
 
 
 setup_logger()
@@ -23,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 # Initialize colorama
 init(autoreset=True)
-
 
 def debug_config(key, masked=False):
     """Print configuration loading status."""
@@ -36,8 +37,50 @@ def debug_config(key, masked=False):
     display_value = "********" if masked and value else value
     logger.info(f"[CONFIG] {key}: {status} ({display_value})")
 
+def load_environment(env_file=None):
+    """
+    Load environment variables from a specified file.
+    
+    Args:
+        env_file (str, optional): Path to the .env file. If None, checks command line args.
+    
+    Returns:
+        str: Path to the loaded environment file
+    """
+    # Default path should be /app/.env for Docker environments
+    default_env_path = "/app/.env"
+    
+    # If no env_file is specified, check for custom env file from command line arguments
+    if env_file is None:
+        env_file = default_env_path  # Use Docker default path
+        for i, arg in enumerate(sys.argv):
+            if arg in ["-env", "--envfile"] and i + 1 < len(sys.argv):
+                env_file = sys.argv[i + 1]
+                break
+    
+    # Check if the file exists
+    if not os.path.exists(env_file):
+        logger.warning(f"{Fore.YELLOW}[CONFIG] Environment file not found: {env_file}")
+        if env_file != default_env_path and os.path.exists(default_env_path):
+            logger.info(f"{Fore.GREEN}[CONFIG] Falling back to default: {default_env_path}")
+            env_file = default_env_path
+    
+    # Load environment variables from the specified file
+    success = load_dotenv(dotenv_path=env_file, override=True)
+    
+    if success:
+        logger.info(f"{Fore.GREEN}[CONFIG] Successfully loaded environment from: {env_file}")
+    else:
+        logger.warning(f"{Fore.YELLOW}[CONFIG] Could not load environment from: {env_file}")
+    
+    # Print environment sources to aid in debugging
+    logger.info(f"{Fore.CYAN}[CONFIG] Environment files checked: {env_file}")
+    
+    return env_file
 
-load_dotenv()
+# Load environment variables with explicit default to Docker path
+# We'll use override=True to ensure .env values take precedence over system environment
+env_file = load_environment()
 
 # Database config with debug output
 debug_config("DB_USER")

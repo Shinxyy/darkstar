@@ -118,4 +118,5 @@ COPY . /app/
 RUN echo 'source ~/.bashrc' > /etc/bash.bashrc && \
     echo 'export PATH=$PATH:/root/.local/bin:/usr/local/bin' >> ~/.bashrc
 
-CMD ["/bin/bash", "-c", "source /etc/bash.bashrc && tail -f /dev/null"]
+# Change the CMD to start a bash shell
+CMD ["/bin/bash"]

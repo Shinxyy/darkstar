@@ -1,35 +1,35 @@
-version: '3.8'
+name: greenbone-community-edition
 
 services:
   vulnerability-tests:
     image: registry.community.greenbone.net/community/vulnerability-tests
     environment:
-      STORAGE_PATH: /var/lib/openvas/22.04/vt-data/nasl
+      FEED_RELEASE: "24.10"
     volumes:
       - vt_data_vol:/mnt
     networks:
-      - automatic-propagation_vuln_net
+      - darkstar_vuln_net
 
   notus-data:
     image: registry.community.greenbone.net/community/notus-data
     volumes:
       - notus_data_vol:/mnt
     networks:
-      - automatic-propagation_vuln_net
+      - darkstar_vuln_net
 
   scap-data:
     image: registry.community.greenbone.net/community/scap-data
     volumes:
       - scap_data_vol:/mnt
     networks:
-      - automatic-propagation_vuln_net
+      - darkstar_vuln_net
 
   cert-bund-data:
     image: registry.community.greenbone.net/community/cert-bund-data
     volumes:
       - cert_data_vol:/mnt
     networks:
-      - automatic-propagation_vuln_net
+      - darkstar_vuln_net
 
   dfn-cert-data:
     image: registry.community.greenbone.net/community/dfn-cert-data
@@ -38,30 +38,34 @@ services:
     depends_on:
       - cert-bund-data
     networks:
-      - automatic-propagation_vuln_net
+      - darkstar_vuln_net
 
   data-objects:
     image: registry.community.greenbone.net/community/data-objects
+    environment:
+      FEED_RELEASE: "24.10"
     volumes:
       - data_objects_vol:/mnt
     networks:
-      - automatic-propagation_vuln_net
+      - darkstar_vuln_net
 
   report-formats:
     image: registry.community.greenbone.net/community/report-formats
+    environment:
+      FEED_RELEASE: "24.10"
     volumes:
       - data_objects_vol:/mnt
     depends_on:
       - data-objects
     networks:
-      - automatic-propagation_vuln_net
+      - darkstar_vuln_net
 
   gpg-data:
     image: registry.community.greenbone.net/community/gpg-data
     volumes:
       - gpg_data_vol:/mnt
     networks:
-      - automatic-propagation_vuln_net
+      - darkstar_vuln_net
 
   redis-server:
     image: registry.community.greenbone.net/community/redis-server
@@ -69,7 +73,7 @@ services:
     volumes:
       - redis_socket_vol:/run/redis/
     networks:
-      - automatic-propagation_vuln_net
+      - darkstar_vuln_net
 
   pg-gvm:
     image: registry.community.greenbone.net/community/pg-gvm:stable
@@ -78,13 +82,12 @@ services:
       - psql_data_vol:/var/lib/postgresql
       - psql_socket_vol:/var/run/postgresql
     networks:
-      - automatic-propagation_vuln_net
-      
+      - darkstar_vuln_net
+
   gvmd:
     image: registry.community.greenbone.net/community/gvmd:stable
     restart: on-failure
     volumes:
-      - ./openvas/openvas_api.py:/opt/openvas_api.py
       - gvmd_data_vol:/var/lib/gvm
       - scap_data_vol:/var/lib/gvm/scap-data/
       - cert_data_vol:/var/lib/gvm/cert-data
@@ -94,24 +97,34 @@ services:
       - gvmd_socket_vol:/run/gvmd
       - ospd_openvas_socket_vol:/run/ospd
       - psql_socket_vol:/var/run/postgresql
+      - ./openvas/openvas_api.py:/opt/openvas_api.py
+    depends_on:
+      pg-gvm:
+        condition: service_started
+      scap-data:
+        condition: service_completed_successfully
+      cert-bund-data:
+        condition: service_completed_successfully
+      dfn-cert-data:
+        condition: service_completed_successfully
+      data-objects:
+        condition: service_completed_successfully
+      report-formats:
+        condition: service_completed_successfully
     networks:
-      - automatic-propagation_vuln_net
-    ports:
-      - "5000:5000"
-  
-
+      - darkstar_vuln_net
 
   gsa:
     image: registry.community.greenbone.net/community/gsa:stable
     restart: on-failure
     ports:
-      - 9392:80
+      - 127.0.0.1:9392:80
     volumes:
       - gvmd_socket_vol:/run/gvmd
     depends_on:
       - gvmd
     networks:
-      - automatic-propagation_vuln_net
+      - darkstar_vuln_net
 
   configure-openvas:
     image: registry.community.greenbone.net/community/openvas-scanner:stable
@@ -129,7 +142,7 @@ services:
         touch /var/log/openvas/openvas.log
         chmod 666 /var/log/openvas/openvas.log
     networks:
-      - automatic-propagation_vuln_net
+      - darkstar_vuln_net
 
   openvas:
     image: registry.community.greenbone.net/community/openvas-scanner:stable
@@ -147,15 +160,44 @@ services:
       configure-openvas:
         condition: service_completed_successfully
     networks:
-      - automatic-propagation_vuln_net
+      - darkstar_vuln_net
+
+  openvasd:
+    image: registry.community.greenbone.net/community/openvas-scanner:stable
+    restart: on-failure
+    environment:
+      # `service_notus` is set to disable everything but notus,
+      # if you want to utilize openvasd directly, remove `OPENVASD_MODE`
+      OPENVASD_MODE: service_notus
+      GNUPGHOME: /etc/openvas/gnupg
+      LISTENING: 0.0.0.0:80
+    volumes:
+      - openvas_data_vol:/etc/openvas
+      - openvas_log_data_vol:/var/log/openvas
+      - gpg_data_vol:/etc/openvas/gnupg
+      - notus_data_vol:/var/lib/notus
+    # enable port forwarding when you want to use the http api from your host machine
+    # ports:
+    #   - 127.0.0.1:3000:80
+    depends_on:
+      vulnerability-tests:
+        condition: service_completed_successfully
+      configure-openvas:
+        condition: service_completed_successfully
+      gpg-data:
+        condition: service_completed_successfully
+    networks:
+      darkstar_vuln_net:
+        aliases:
+          - openvasd
 
   ospd-openvas:
     image: registry.community.greenbone.net/community/ospd-openvas:stable
     restart: on-failure
     hostname: ospd-openvas.local
     cap_add:
-      - NET_ADMIN
-      - NET_RAW
+      - NET_ADMIN # for capturing packages in promiscuous mode
+      - NET_RAW # for raw sockets e.g. used for the boreas alive detection
     security_opt:
       - seccomp=unconfined
       - apparmor=unconfined
@@ -168,7 +210,7 @@ services:
         "--notus-feed-dir",
         "/var/lib/notus/advisories",
         "-m",
-        "666"
+        "666",
       ]
     volumes:
       - gpg_data_vol:/etc/openvas/gnupg
@@ -188,7 +230,18 @@ services:
       configure-openvas:
         condition: service_completed_successfully
     networks:
-      - automatic-propagation_vuln_net
+      - darkstar_vuln_net
+
+  gvm-tools:
+    image: registry.community.greenbone.net/community/gvm-tools
+    volumes:
+      - gvmd_socket_vol:/run/gvmd
+      - ospd_openvas_socket_vol:/run/ospd
+    depends_on:
+      - gvmd
+      - ospd-openvas
+    networks:
+      - darkstar_vuln_net
 
 volumes:
   gpg_data_vol:
@@ -207,5 +260,5 @@ volumes:
   openvas_log_data_vol:
 
 networks:
-  automatic-propagation_vuln_net:
+  darkstar_vuln_net:
     external: true
