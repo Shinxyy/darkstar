@@ -5,8 +5,21 @@ env
 .env.*
 
 __pycache__
+__pycache__/
 
 search_epss
 
 notes.md
+.idea
+.vscode
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.dat
+*.log
+*.out
+*/scan_results
+*/bbot_output
 

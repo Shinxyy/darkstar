@@ -7,9 +7,9 @@ import json
 import time
 import netaddr
 import logging  # Add missing logging import
-from modules.vulns import Vulnerability
-from modules.db_helper import insert_vulnerability_to_database
-from modules.config import OPENVAS_USER, OPENVAS_PASSWORD
+from core.models.vulnerability import Vulnerability
+from common.db_helper import insert_vulnerability_to_database
+from common.config import OPENVAS_USER, OPENVAS_PASSWORD
 import pandas as pd
 from colorama import Fore, Style, init
 
@@ -50,7 +50,7 @@ class openvas():
         self.scan_name = ""
         self.command_prefix = '' 
         self.alive_test = 'ICMP, TCP-ACK Service &amp; ARP Ping'
-        self.scanConfigID = "daba56c8-73ec-11df-a475-002264764cea"  # Full and very deep ultimate
+        self.scanConfigID = "698f691e-7489-11df-9d8c-002264764cea"  # Full and very deep ultimate
         self.formatID = "a994b278-1f62-11e1-96ac-406186ea4fc5"
         self.org_name = org_name
     
@@ -65,7 +65,7 @@ class openvas():
         try:
             print(f"{Fore.BLUE}[*] Retrieving report {reportID} to {report_location}{Style.RESET_ALL}")
             command = f'{self.command_prefix} "<get_reports report_id=\'{reportID}\' filter=\'apply_overrides=0 levels=hml min_qod=50 first=1 rows=1000 sort=name ignore_pagination=1\' details=\'1\' format_id=\'{self.formatID}\'/>"'
-            response = requests.post('http://automatic-propagation-gvmd-1:5000/get_report',
+            response = requests.post('http://greenbone-community-edition-gvmd-1:5000/get_report',
                                     json={'command': command})
             report_data = response.json()['message'].strip()
     
@@ -88,7 +88,7 @@ class openvas():
         self.queue_scan_names.append(self.scan_name)
         self.queue_report_location.append(self.report_location)
         command = f'{self.command_prefix} "<CREATE_TARGET><name>{self.scan_name}</name><hosts>{self.ip}</hosts><alive_tests>{self.alive_test}</alive_tests><port_range>1-65535</port_range></CREATE_TARGET>"'
-        response = requests.post('http://automatic-propagation-gvmd-1:5000/create_target',
+        response = requests.post('http://greenbone-community-edition-gvmd-1:5000/create_target',
                                  json={'command': command})
         self.targetID = response.json()['message']
         
@@ -99,10 +99,42 @@ class openvas():
         Uses the previously created target ID to establish a new scanning task.
         Stores the created task ID in self.taskID.
         """
+        print(f"{Fore.BLUE}[*] Creating task for target {self.ip} with target ID {self.targetID}{Style.RESET_ALL}")
         command = f'{self.command_prefix} \'<CREATE_TASK><name>{self.scan_name}</name><Comment>Openvas Scan on {self.ip}</Comment><target id="{self.targetID}" /><config id="{self.scanConfigID}" /></CREATE_TASK>\''
-        response = requests.post('http://automatic-propagation-gvmd-1:5000/create_task',
-                                 json={'command': command})
-        self.taskID = response.json()['message']
+        print(f"{Fore.BLUE}[*] Executing command: {command}{Style.RESET_ALL}")
+        
+        try:
+            response = requests.post('http://greenbone-community-edition-gvmd-1:5000/create_task',
+                                    json={'command': command})
+            
+            # Add better error handling
+            if response.status_code != 200:
+                print(f"{Fore.RED}[!] Error creating task: HTTP {response.status_code}{Style.RESET_ALL}")
+                logging.error(f"Error creating task: HTTP {response.status_code}, Response: {response.text}")
+                raise Exception(f"Failed to create task: HTTP {response.status_code}")
+            
+            response_data = response.json()
+            if 'message' not in response_data:
+                print(f"{Fore.RED}[!] Error creating task: Invalid response format{Style.RESET_ALL}")
+                logging.error(f"Error creating task: Invalid response format: {response_data}")
+                raise Exception("Invalid response format when creating task")
+                
+            self.taskID = response_data['message']
+            
+            # Verify that task ID looks valid (UUID format)
+            import re
+            if not re.match(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', self.taskID):
+                print(f"{Fore.YELLOW}[!] Warning: Task ID may not be valid: {self.taskID}{Style.RESET_ALL}")
+                # Check if it's an error message
+                if 'Failed' in self.taskID or 'Error' in self.taskID:
+                    print(f"{Fore.RED}[!] Error creating task: {self.taskID}{Style.RESET_ALL}")
+                    raise Exception(f"Failed to create task: {self.taskID}")
+            
+            print(f"{Fore.GREEN}[+] Created task with ID: {self.taskID}{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.RED}[!] Error in create_task: {str(e)}{Style.RESET_ALL}")
+            logging.error(f"Error in create_task: {e}")
+            raise
     
     def run_task(self):
         """
@@ -110,11 +142,45 @@ class openvas():
         
         Initiates the scan and adds the resulting report ID to the queue.
         """
+        print(f"{Fore.BLUE}[*] Running task with ID: {self.taskID}{Style.RESET_ALL}")
         command = f'{self.command_prefix} \'<start_task task_id="{self.taskID}"/>\''
-        response = requests.post('http://automatic-propagation-gvmd-1:5000/run_task',
-                                 json={'command': command})
-        self.reportID = response.json()['message']
-        self.queue_reportIDs.append(self.reportID)
+        print(f"{Fore.BLUE}[*] Executing command: {command}{Style.RESET_ALL}")
+        
+        try:
+            response = requests.post('http://greenbone-community-edition-gvmd-1:5000/run_task',
+                                    json={'command': command})
+            
+            # Add better error handling
+            if response.status_code != 200:
+                print(f"{Fore.RED}[!] Error running task: HTTP {response.status_code}{Style.RESET_ALL}")
+                logging.error(f"Error running task: HTTP {response.status_code}, Response: {response.text}")
+                raise Exception(f"Failed to run task: HTTP {response.status_code}")
+            
+            response_data = response.json()
+            if 'message' not in response_data:
+                print(f"{Fore.RED}[!] Error running task: Invalid response format{Style.RESET_ALL}")
+                logging.error(f"Error running task: Invalid response format: {response_data}")
+                raise Exception("Invalid response format when running task")
+            
+            self.reportID = response_data['message']
+            
+            # Verify that report ID looks valid (check for error markers)
+            if 'Failed' in self.reportID or 'Error' in self.reportID:
+                print(f"{Fore.RED}[!] Error starting task: {self.reportID}{Style.RESET_ALL}")
+                logging.error(f"Error starting task: {self.reportID}")
+                raise Exception(f"Failed to start task: {self.reportID}")
+            
+            # Verify UUID format
+            import re
+            if not re.match(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', self.reportID):
+                print(f"{Fore.YELLOW}[!] Warning: Report ID may not be valid: {self.reportID}{Style.RESET_ALL}")
+            
+            print(f"{Fore.GREEN}[+] Started task, got report ID: {self.reportID}{Style.RESET_ALL}")
+            self.queue_reportIDs.append(self.reportID)
+        except Exception as e:
+            print(f"{Fore.RED}[!] Error in run_task: {str(e)}{Style.RESET_ALL}")
+            logging.error(f"Error in run_task: {e}")
+            raise
     
     def check_if_finished(self, reportID):
         """
@@ -129,13 +195,46 @@ class openvas():
             bool: True if scan is complete, False otherwise
         """
         try:
+            print(f"{Fore.BLUE}[*] Checking if scan with report ID {reportID} is finished{Style.RESET_ALL}")
             # Using the GMP API directly without relying on the xml2 command
             command = f'{self.command_prefix} "<get_reports report_id=\'{reportID}\' format_id=\'{self.formatID}\'/>"'
-            response = requests.post('http://automatic-propagation-gvmd-1:5000/check_if_finished',
+            response = requests.post('http://greenbone-community-edition-gvmd-1:5000/check_if_finished',
                                     json={'command': command})
             
             # Parse the XML response to get progress and status
             report_data = response.json()['message'].strip()
+            
+            # Check for error XML response
+            if '<error>' in report_data:
+                print(f"{Fore.RED}[!] Error response from check_if_finished: {report_data}{Style.RESET_ALL}")
+                # Try to extract error message
+                import re
+                error_match = re.search(r'<error>(.*?)</error>', report_data)
+                if error_match:
+                    error_msg = error_match.group(1)
+                    print(f"{Fore.RED}[!] Error message: {error_msg}{Style.RESET_ALL}")
+                    
+                    # Check if this is a report format error
+                    if 'report format' in error_msg.lower():
+                        print(f"{Fore.YELLOW}[!] Report format error detected. Checking valid format IDs...{Style.RESET_ALL}")
+                        # Try to get list of valid report formats
+                        format_command = f'{self.command_prefix} "<get_report_formats/>"'
+                        format_response = requests.post('http://greenbone-community-edition-gvmd-1:5000/get_report',
+                                                      json={'command': format_command})
+                        format_data = format_response.json()['message'].strip()
+                        print(f"{Fore.BLUE}[*] Available report formats: {format_data}{Style.RESET_ALL}")
+                        
+                        # Try to find any valid format ID
+                        import re
+                        format_ids = re.findall(r'id="([a-f0-9-]+)"', format_data)
+                        if format_ids:
+                            print(f"{Fore.GREEN}[+] Found valid format IDs: {format_ids}{Style.RESET_ALL}")
+                            # Use the first valid format ID
+                            self.formatID = format_ids[0]
+                            print(f"{Fore.GREEN}[+] Updated format ID to: {self.formatID}{Style.RESET_ALL}")
+                        
+                return False
+            
             try:
                 root = ET.fromstring(report_data)
                 # Find the scan status in the XML
@@ -163,6 +262,7 @@ class openvas():
                         return False
                 else:
                     print(f"{Fore.RED}[!] Could not find scan status in response{Style.RESET_ALL}")
+                    print(f"{Fore.BLUE}[*] Full XML response: {report_data}{Style.RESET_ALL}")
                     return False
             except ET.ParseError as e:
                 print(f"{Fore.RED}[!] Error parsing XML response: {str(e)}{Style.RESET_ALL}")
