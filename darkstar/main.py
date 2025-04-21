@@ -310,23 +310,23 @@ class worker:
             tasks.append(run_port_scan())
 
             # Add OpenVAS if we have IPv4 targets
-            if not self.target_df["IPv4"].empty:
-                async def run_openvas():
-                    logger.info("Starting OpenVAS scan on IPv4 targets from CLI")
+            # if not self.target_df["IPv4"].empty:
+            #     async def run_openvas():
+            #         logger.info("Starting OpenVAS scan on IPv4 targets from CLI")
 
-                    with ThreadPoolExecutor() as executor:
-                        openvas_handler = openvas(
-                            targets=self.target_df["IPv4"], org_name=self.org_domain
-                        )
-                        await asyncio.get_event_loop().run_in_executor(
-                            executor, openvas_handler.run
-                        )
+            #         with ThreadPoolExecutor() as executor:
+            #             openvas_handler = openvas(
+            #                 targets=self.target_df["IPv4"], org_name=self.org_domain
+            #             )
+            #             await asyncio.get_event_loop().run_in_executor(
+            #                 executor, openvas_handler.run
+            #             )
 
-                tasks.append(run_openvas())
-            else:
-                logger.warning(
-                    f"{Fore.RED}[-] No IPv4 targets found, skipping OpenVAS{Style.RESET_ALL}"
-                )
+            #     tasks.append(run_openvas())
+            # else:
+            #     logger.warning(
+            #         f"{Fore.RED}[-] No IPv4 targets found, skipping OpenVAS{Style.RESET_ALL}"
+            #     )
 
             # Run all tasks in parallel
             await asyncio.gather(*tasks)
