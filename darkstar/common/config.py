@@ -98,9 +98,3 @@ db_config = {
 # API keys with debug output
 debug_config("HIBP_KEY", masked=True)
 HIBP_KEY = os.getenv("HIBP_KEY")
-
-# OpenVAS credentials with debug output
-debug_config("OPENVAS_USER")
-debug_config("OPENVAS_PASSWORD", masked=True)
-OPENVAS_USER = os.getenv("OPENVAS_USER")
-OPENVAS_PASSWORD = os.getenv("OPENVAS_PASSWORD")

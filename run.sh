@@ -7,8 +7,6 @@ DB_NAME="test"
 DB_USER="data_guru"
 DB_PASSWORD="kjafskljfs836487348akskdhkasdhk"
 HIBP_KEY=""
-OPENVAS_USER=""
-OPENVAS_PASSWORD=""
 
 # Check if .env file exists, if not create it
 if [ ! -f ./darkstar/.env ]; then
@@ -23,10 +21,6 @@ DB_PASSWORD=${DB_PASSWORD}
 
 # HIBP
 HIBP_KEY=${HIBP_KEY}
-
-# OpenVAS
-OPENVAS_USER=${OPENVAS_USER}
-OPENVAS_PASSWORD=${OPENVAS_PASSWORD}
 EOF
 fi
 
@@ -43,14 +37,6 @@ sleep 10
 
 # Remove redundant command since we added tail -f /dev/null to docker-compose.yaml
 # docker exec darkstar bash -c "nohup tail -f /dev/null > /dev/null 2>&1 &"
-
-# Setup openvas docker
-# echo '[+] Building the OpenVAS docker'
-# docker compose -f docker-compose.openvas.yaml up -d --build
-
-# Start the custom api service
-# echo '[+] Starting API Service OpenVAS'
-# docker exec greenbone-community-edition-gvmd-1 /bin/sh -c "apt update && apt install python3-pip procps -y && python3 -m pip install gvm-tools Flask requests --break-system-packages && python3 /opt/openvas_api.py && tail -f /dev/null" &
 
 echo '[+] Cleaning up'
 sleep 5

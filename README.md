@@ -48,7 +48,7 @@ Darkstar leverages high quality threat intelligence sources:
 - [CISA Kev](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) – Known exploited vulnerabilities
 
 ## Security Tip
-Please change the database password and the openvas password if running in production environment
+Please change the database password password if running in production environment
 
 ## Lead Developers
 - [![LinkedIn](https://i.sstatic.net/gVE0j.png) Joost Grunwald](https://www.linkedin.com/in/joost-grunwald-1a48a31b2)

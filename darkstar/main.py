@@ -20,7 +20,6 @@ import pandas as pd
 import warnings
 from scanners.bbot import BBotScanner
 from scanners.nuclei import NucleiScanner, WordPressNucleiScanner
-from scanners.vulnscan.openvas import openvas
 from colorama import Fore, Style, init
 from scanners.recon import WordPressDetector
 import asyncio
@@ -218,22 +217,6 @@ class worker:
                         "No WordPress sites provided, skipping WordPress-specific scans"
                     )
 
-            # async def run_openvas_scan():
-            #     if not self.target_df["IPv4"].empty:
-            #         logger.info("Starting OpenVAS scan on IPv4 targets")
-
-            #         with ThreadPoolExecutor() as executor:
-            #             openvas_handler = openvas(
-            #                 targets=self.target_df["IPv4"], org_name=self.org_domain
-            #             )
-            #             await asyncio.get_event_loop().run_in_executor(
-            #                 executor, openvas_handler.run
-            #             )
-            #     else:
-            #         logger.warning(
-            #             f"{Fore.RED}[-] No IPv4 targets found, skipping OpenVAS{Style.RESET_ALL}"
-            #         )
-
             # Execute port discovery and bbot in parallel
             port_discovery_task = asyncio.create_task(run_port_discovery())
             bbot_task = asyncio.create_task(run_bbot_scan())
@@ -243,10 +226,9 @@ class worker:
                 port_discovery_task, bbot_task
             )
 
-            # Now run nuclei, wordpress detection, and openvas in parallel
+            # Now run nuclei, wordpress detection
             tasks = [
                 run_nuclei_scan(bbot_results["subdomains_file"]),
-                # run_openvas_scan(),
             ]
 
             # Detect WordPress and automatically run WordPress-specific Nuclei
@@ -308,25 +290,6 @@ class worker:
                 return {"scan_processed": scan_processed}
             
             tasks.append(run_port_scan())
-
-            # Add OpenVAS if we have IPv4 targets
-            # if not self.target_df["IPv4"].empty:
-            #     async def run_openvas():
-            #         logger.info("Starting OpenVAS scan on IPv4 targets from CLI")
-
-            #         with ThreadPoolExecutor() as executor:
-            #             openvas_handler = openvas(
-            #                 targets=self.target_df["IPv4"], org_name=self.org_domain
-            #             )
-            #             await asyncio.get_event_loop().run_in_executor(
-            #                 executor, openvas_handler.run
-            #             )
-
-            #     tasks.append(run_openvas())
-            # else:
-            #     logger.warning(
-            #         f"{Fore.RED}[-] No IPv4 targets found, skipping OpenVAS{Style.RESET_ALL}"
-            #     )
 
             # Run all tasks in parallel
             await asyncio.gather(*tasks)
