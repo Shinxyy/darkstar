@@ -32,6 +32,7 @@ from concurrent.futures import ThreadPoolExecutor
 from common.logger import setup_logger
 from core.utils import get_scan_targets, prepare_output_directory
 from common.config import load_environment
+from openvas.openvas_connector import OpenVASAPIClient
 
 
 setup_logger()
@@ -434,10 +435,65 @@ class worker:
             # Wait for all tasks to complete
             await asyncio.gather(*tasks)
             
+        # ─── openvas mode via FastAPI ───
+        elif self.mode == 5:
+            all_scan_targets = get_scan_targets(self.target_df)
+            logger.info(f"{Fore.CYAN}Discovered Targets: {Fore.YELLOW}{all_scan_targets}{Style.RESET_ALL}")
+
+            # Use our async HTTP connector
+            async with OpenVASAPIClient() as openvas:
+                # 1) Create all targets in parallel
+                create_tasks = [
+                    openvas.create_target(name=f"Discovered {t}", hosts=[t])
+                    for t in all_scan_targets
+                ]
+                created = await asyncio.gather(*create_tasks, return_exceptions=True)
+
+                # filter out errors and extract real target IDs
+                target_results = []
+                for idx, res in enumerate(created):
+                    if isinstance(res, Exception):
+                        logger.error(f"Failed to create target for {all_scan_targets[idx]}: {res}")
+                    else:
+                        logger.info(f"Created target {res['id']} for {res['name']}")
+                        target_results.append(res)
+
+                # 2) For each new target, create a scan task
+                task_creates = [
+                    openvas.create_task(
+                        name=f"Scan for {t['name']}",
+                        target_id=t["id"]
+                    )
+                    for t in target_results
+                ]
+                tasks = await asyncio.gather(*task_creates, return_exceptions=True)
+
+                # collect only the successful task infos
+                task_results = []
+                for idx, res in enumerate(tasks):
+                    if isinstance(res, Exception):
+                        logger.error(f"Failed to create task for target {target_results[idx]['id']}: {res}")
+                    else:
+                        logger.info(f"Created task {res['id']} ({res['name']})")
+                        task_results.append(res)
+
+                # 3) Start each task
+                start_calls = [
+                    openvas.start_task(task["id"])
+                    for task in task_results
+                ]
+                starts = await asyncio.gather(*start_calls, return_exceptions=True)
+
+                for idx, res in enumerate(starts):
+                    if isinstance(res, Exception):
+                        logger.error(f"Failed to start task {task_results[idx]['id']}: {res}")
+                    else:
+                        logger.info(f"Started task {task_results[idx]['id']}: {res}")
+
+            logger.info(f"{Fore.GREEN}[+] OpenVAS: created {len(target_results)} targets and {len(task_results)} tasks, all started{Style.RESET_ALL}")
+
         else:
-            logger.error(
-                f"{Fore.RED}[-] Invalid mode {self.mode} specified{Style.RESET_ALL}"
-            )
+            logger.error(f"{Fore.RED}[-] Invalid mode {self.mode} specified{Style.RESET_ALL}")
 
 
 def parse_targets(targets_str: str) -> pd.DataFrame:
@@ -483,7 +539,7 @@ def main(args=None):
         type=int,
         required=True,
         help="Scan intrusiveness: 1. passive, 2. normal, 3. aggressive, 4. attack surface",
-        choices=[1, 2, 3, 4],
+        choices=[1, 2, 3, 4, 5],
     )
     parser.add_argument(
         "-d",
@@ -533,6 +589,7 @@ def main(args=None):
         2: f"{Fore.YELLOW}NORMAL MODE{Style.RESET_ALL} - Standard scanning with passive and selected active modules",
         3: f"{Fore.RED}AGGRESSIVE MODE{Style.RESET_ALL} - Full scanning with all active and aggressive modules",
         4: f"{Fore.RED}ATTACK SURFACE MODE{Style.RESET_ALL} - Attack surface mapping with custom modules",
+        5: f"{Fore.RED}Openvas{Style.RESET_ALL} - Testing OpenVAS integration",
     }
     logger.info(f"Initializing scan in {mode_info[args.mode]}")
 
