@@ -33,6 +33,7 @@ from common.logger import setup_logger
 from core.utils import get_scan_targets, prepare_output_directory
 from common.config import load_environment
 from openvas.openvas_connector import OpenVASAPIClient
+import datetime
 
 
 setup_logger()
@@ -444,7 +445,7 @@ class worker:
             async with OpenVASAPIClient() as openvas:
                 # 1) Create all targets in parallel
                 create_tasks = [
-                    openvas.create_target(name=f"Discovered {t}", hosts=[t])
+                    openvas.create_target(name=f"Discovered {t} - {datetime.datetime.now()}", hosts=[t])
                     for t in all_scan_targets
                 ]
                 created = await asyncio.gather(*create_tasks, return_exceptions=True)
