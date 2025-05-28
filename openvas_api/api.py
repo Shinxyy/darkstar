@@ -110,7 +110,11 @@ def create_task(body: TaskCreate, gmp: Gmp = Depends(get_gmp)):
     if body.scanner_id is None:
         scn_resp = gmp.get_scanners()
         scn_root = _parse_xml(scn_resp)
-        scn = scn_root.find(".//scanner")
+        scanners = scn_root.findall(".//scanner")
+        if len(scanners) > 1:
+            scn = scanners[1]  # Use the second scanner
+        else:
+            scn = scanners[0]  # Fallback to the first if only one
         body.scanner_id = scn.get("id")
 
     resp = gmp.create_task(
@@ -139,6 +143,11 @@ def start_task(task_id: str, gmp: Gmp = Depends(get_gmp)):
     """Start a previously created scan task."""
     resp = gmp.start_task(task_id)
     root = _parse_xml(resp)
+    # Get report ID from response
+    report_id = root.findtext("report_id")
+    
+    print(f"Task {task_id} started, report ID: {report_id}")
+
     # return the raw GMP response attributes
     return {elem.tag: elem.attrib for elem in root}
 
