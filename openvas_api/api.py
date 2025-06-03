@@ -99,22 +99,32 @@ def list_targets(gmp: Gmp = Depends(get_gmp)):
 
 @app.post("/tasks", response_model=TaskInfo)
 def create_task(body: TaskCreate, gmp: Gmp = Depends(get_gmp)):
-    """Create a scan task (but not start it yet)."""
+    """Create a scan task for a given target."""
+    
     # pick defaults if not provided:
     if body.config_id is None:
-        cfg_resp = gmp.get_scan_configs()
+        cfg_resp = gmp.get_scan_configs()  
         cfg_root = _parse_xml(cfg_resp)
-        # find config named “Full and fast”
+        
+        # find config named "Full and fast"
         cfg = cfg_root.find(".//config[name='Full and fast']") or cfg_root.find(".//config")
-        body.config_id = cfg.get("id")
+        if cfg is not None:
+            body.config_id = cfg.get("id")
+        else:
+            raise HTTPException(500, "No scan configuration found")
+    
     if body.scanner_id is None:
         scn_resp = gmp.get_scanners()
         scn_root = _parse_xml(scn_resp)
+        
         scanners = scn_root.findall(".//scanner")
+        
         if len(scanners) > 1:
-            scn = scanners[1]  # Use the second scanner
+            scn = scanners[1]  
+        elif len(scanners) == 1:
+            scn = scanners[0]  
         else:
-            scn = scanners[0]  # Fallback to the first if only one
+            raise HTTPException(500, "No scanner found")
         body.scanner_id = scn.get("id")
 
     resp = gmp.create_task(
@@ -123,7 +133,9 @@ def create_task(body: TaskCreate, gmp: Gmp = Depends(get_gmp)):
         target_id=body.target_id,
         scanner_id=body.scanner_id
     )
+    
     root = _parse_xml(resp)
+    
     status = root.get("status", "unknown error")
     id_     = root.get("id", "")
     status_text = root.get("status_text", "unknown error")
@@ -132,7 +144,7 @@ def create_task(body: TaskCreate, gmp: Gmp = Depends(get_gmp)):
         return TaskInfo(
             id=id_,
             name=body.name,
-            status="Created"     # or pull status_text if you prefer
+            status="Created"
         )
 
     raise HTTPException(int(status), status_text)
@@ -142,14 +154,52 @@ def create_task(body: TaskCreate, gmp: Gmp = Depends(get_gmp)):
 def start_task(task_id: str, gmp: Gmp = Depends(get_gmp)):
     """Start a previously created scan task."""
     resp = gmp.start_task(task_id)
+    print(f"Raw XML response: {resp}")
     root = _parse_xml(resp)
-    # Get report ID from response
-    report_id = root.findtext("report_id")
     
-    print(f"Task {task_id} started, report ID: {report_id}")
-
-    # return the raw GMP response attributes
-    return {elem.tag: elem.attrib for elem in root}
+    # Debug: Print the entire XML structure
+    print(f"XML root tag: {root.tag}")
+    print(f"XML root attributes: {root.attrib}")
+    for child in root:
+        print(f"Child element: {child.tag}, text: {child.text}, attrib: {child.attrib}")
+    
+    # Try multiple ways to get the report ID
+    report_id = None
+    
+    # Method 1: Direct text content
+    report_id = root.findtext("report_id")
+    print(f"Method 1 - findtext('report_id'): {report_id}")
+    
+    # Method 2: As attribute
+    if not report_id:
+        report_id = root.get("report_id")
+        print(f"Method 2 - root.get('report_id'): {report_id}")
+    
+    # Method 3: Look for report element
+    if not report_id:
+        report_elem = root.find(".//report")
+        if report_elem is not None:
+            report_id = report_elem.get("id")
+            print(f"Method 3 - report element id: {report_id}")
+    
+    # Method 4: Check if it's nested differently
+    if not report_id:
+        for elem in root.iter():
+            if elem.tag == "report_id" or "report" in elem.tag.lower():
+                print(f"Found element: {elem.tag}, text: {elem.text}, attrib: {elem.attrib}")
+                if elem.text:
+                    report_id = elem.text
+                elif elem.get("id"):
+                    report_id = elem.get("id")
+    
+    print(f"Final report_id: {report_id}")
+    
+    # Return a dictionary with both task_id and report_id for monitoring
+    return {
+        "task_id": task_id,
+        "report_id": report_id,
+        "status": "Started"
+    } 
 
 @app.get("/tasks", response_model=List[TaskInfo])
 def list_tasks(gmp: Gmp = Depends(get_gmp)):
@@ -179,7 +229,7 @@ def get_report(report_id: str, gmp: Gmp = Depends(get_gmp)):
     # pick the XML report format
     rf = _parse_xml(gmp.get_report_formats()).find(".//report_format[name='XML']") 
     rf_id = rf.get("id") if rf is not None else _parse_xml(gmp.get_report_formats()).find(".//report_format").get("id")
-
+    print(f"Using report format ID: {rf_id} for report {report_id}")
     report = gmp.get_report(report_id=report_id, report_format_id=rf_id)
     if isinstance(report, bytes):
         report = report.decode()

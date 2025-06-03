@@ -9,9 +9,9 @@ DB_PASSWORD="kjafskljfs836487348akskdhkasdhk"
 HIBP_KEY=""
 
 # Check if .env file exists, if not create it
-if [ ! -f ./darkstar/.env ]; then
+if [ ! -f .env ]; then
   echo "Creating .env file..."
-  cat > ./darkstar/.env << EOF
+  cat > .env << EOF
 # Database credentials for MariaDB and Python
 MYSQL_ROOT_PASSWORD=${ROOT_PASSWORD}
 DB_HOST=${DB_HOST}
@@ -19,9 +19,15 @@ DB_NAME=${DB_NAME}
 DB_USER=${DB_USER}
 DB_PASSWORD=${DB_PASSWORD}
 
-# HIBP
+# HIBPam
 HIBP_KEY=${HIBP_KEY}
 EOF
+fi
+
+# Also ensure the darkstar/.env file exists for the darkstar container
+if [ ! -f ./darkstar/.env ]; then
+  echo "Creating darkstar/.env file..."
+  cp .env ./darkstar/.env
 fi
 
 # Enabling BuildKit for faster builds
@@ -35,11 +41,6 @@ docker compose -f docker-compose.yaml up -d --build
 echo '[+] Waiting for containers to initialize...'
 sleep 10
 
-# Remove redundant command since we added tail -f /dev/null to docker-compose.yaml
-# docker exec darkstar bash -c "nohup tail -f /dev/null > /dev/null 2>&1 &"
-
-echo '[+] Cleaning up'
-sleep 5
 
 # More robust container status check
 echo '[+] Checking if darkstar container is running...'

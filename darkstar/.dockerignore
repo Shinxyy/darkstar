@@ -54,3 +54,4 @@ docker-compose.yaml
 # Other
 *.md
 LICENSE
+openvas_reports*/

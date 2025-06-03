@@ -3,12 +3,9 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-# Copy and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY . /app
 
-# Copy your API code
-COPY api.py .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Expose the FastAPI port
 EXPOSE 8008

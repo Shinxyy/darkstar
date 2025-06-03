@@ -49,12 +49,8 @@ class OpenVASAPIClient:
         resp.raise_for_status()
         return resp.json()
 
-    async def create_task(self, name: str, target_id: str, config_id: Optional[str] = None, scanner_id: Optional[str] = None) -> Dict[str, Any]:
+    async def create_task(self, name: str, target_id: str) -> Dict[str, Any]:
         payload: Dict[str, Any] = {"name": name, "target_id": target_id}
-        if config_id:
-            payload["config_id"] = config_id
-        if scanner_id:
-            payload["scanner_id"] = scanner_id
         resp = await self._client.post("/tasks", json=payload)
         resp.raise_for_status()
         return resp.json()
@@ -75,7 +71,8 @@ class OpenVASAPIClient:
         return resp.json()
 
     async def get_report(self, report_id: str) -> str:
-        resp = await self._client.get(f"/reports/{report_id}")
+        url = f"/reports/{report_id}"
+        resp = await self._client.get(url)
         resp.raise_for_status()
         return resp.text
 

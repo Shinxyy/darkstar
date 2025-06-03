@@ -1,13 +1,15 @@
-name: darkstar
+version: '3.8'
 services:
   mariadb:
     image: mariadb:10.5
     container_name: mariadb
+    env_file:
+      - .env
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
     volumes:
       - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
       - mariadb_data:/var/lib/mysql
@@ -28,7 +30,7 @@ services:
       dockerfile: Dockerfile
     container_name: darkstar
     env_file:
-      - ./.env
+      - ./darkstar/.env
     ports:
       - "8000:8000"  # Expose the application port (adjust to your app's actual port)
     depends_on:
@@ -274,10 +276,10 @@ services:
     ports:
       - "8008:8008"
     volumes:
-      - gvmd_socket_vol:/run/gvmd    # share the socket with gvmd
+      - gvmd_socket_vol:/run/gvmd 
+      - ./openvas_api:/app
     networks:
       - vuln_net
-
 
 volumes:
   mariadb_data:
