@@ -9,11 +9,9 @@ import os
 import shutil
 from datetime import datetime
 from typing import Dict, List
-from common.logger import setup_logger
 from colorama import Fore, Style
 
 
-setup_logger()
 logger = logging.getLogger(__name__)
 
 # ===== Dependency Verification =====

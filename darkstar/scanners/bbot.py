@@ -12,12 +12,10 @@ import subprocess
 
 import pandas as pd
 
-from common.db_helper import insert_vulnerability_to_database, insert_bbot_to_db
+from core.db_helper import insert_vulnerability_to_database, insert_bbot_to_db
 from core.models.vulnerability import Vulnerability
 from tools.hibp.HIBPwned import HIBPwned
-from common.logger import setup_logger
 
-setup_logger()
 logger = logging.getLogger(__name__)
 
 
@@ -90,7 +88,7 @@ class BBotScanner:
                         f"Adding to database: {finding_object.title} on {finding_object.host}"
                     )
                     insert_vulnerability_to_database(
-                        vuln=finding_object, org_name=self.org_name
+                        vulnerability=finding_object.__dict__, org_name=self.org_name
                     )
                 except Exception as e:
                     logger.error(f"Error processing vulnerability: {e}")

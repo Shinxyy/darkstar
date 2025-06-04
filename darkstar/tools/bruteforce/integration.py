@@ -13,11 +13,9 @@ import os
 from typing import Dict, List, Optional
 
 from tools.bruteforce.hydrapy import HydraAttack
-from common.logger import setup_logger
 from colorama import Fore, Style
 
 
-setup_logger()
 logger = logging.getLogger(__name__)
 
 # Mapping of RustScan service names to Hydra protocol names

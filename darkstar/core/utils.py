@@ -12,9 +12,7 @@ import ipaddress
 import re
 import logging
 from colorama import Fore, Style
-from common.logger import setup_logger
 
-setup_logger()
 logger = logging.getLogger(__name__)
 
 

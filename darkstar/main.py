@@ -31,11 +31,12 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 import datetime
 from openvas.openvas_scanner import OpenVASScanner
-from common.logger import setup_logger
-from common.config import load_environment
 
-
-setup_logger()
+# Set up basic logging configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger("main")
 
 warnings.filterwarnings("ignore")
@@ -43,6 +44,7 @@ init(autoreset=True)
 
 
 def setup_env_from_args(args=None):
+    """Load environment variables from .env file."""
     # Create a minimal argument parser just to grab the --envfile parameter.
     env_parser = argparse.ArgumentParser(add_help=False)
     env_parser.add_argument(
@@ -59,9 +61,24 @@ def setup_env_from_args(args=None):
     else:
         env_args, _ = env_parser.parse_known_args(args)
 
-    # Use the centralized config module to load environment
+    # Load environment from file if it exists
     env_file = env_args.envfile if hasattr(env_args, "envfile") else "/app/.env"
-    load_environment(env_file)
+    if os.path.exists(env_file):
+        try:
+            import dotenv
+            dotenv.load_dotenv(env_file)
+            logger.info(f"Loaded environment from {env_file}")
+        except ImportError:
+            logger.warning("python-dotenv not available, loading env manually")
+            # Manual .env file loading
+            with open(env_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        os.environ[key.strip()] = value.strip()
+    else:
+        logger.warning(f"Environment file {env_file} not found, using defaults")
 
     return env_args
 

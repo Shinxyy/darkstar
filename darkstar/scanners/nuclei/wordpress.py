@@ -10,12 +10,10 @@ import subprocess
 import yaml
 from typing import Optional
 
-from common.db_helper import insert_vulnerability_to_database
+from core.db_helper import insert_vulnerability_to_database
 from core.models.vulnerability import Vulnerability
 from scanners.nuclei.base import BaseNucleiScanner
-from common.logger import setup_logger
 
-setup_logger()
 logger = logging.getLogger(__name__)
 
 

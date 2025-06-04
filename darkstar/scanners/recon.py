@@ -1,6 +1,9 @@
 import requests
 import time
-from common.config import HIBP_KEY
+import os
+
+# Get HIBP API key from environment variable
+HIBP_KEY = os.getenv('HIBP_KEY', '')
 
 """
 Reconnaissance tools for the Darkstar framework.

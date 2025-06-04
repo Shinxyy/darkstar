@@ -13,12 +13,10 @@ from datetime import datetime
 from typing import List, Dict
 
 import dns.asyncresolver
-from common.logger import setup_logger
 
 from scanners.portscan.rustscan_utils import verify_all_installations, save_results
 
 
-setup_logger()
 logger = logging.getLogger(__name__)
 
 

@@ -1,8 +1,9 @@
-version: '3.8'
 services:
+  # Core application services - available in all profiles
   mariadb:
     image: mariadb:10.5
     container_name: mariadb
+    profiles: ["core", "gvm", "darkstar"]
     env_file:
       - .env
     environment:
@@ -14,7 +15,7 @@ services:
       - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
       - mariadb_data:/var/lib/mysql
     ports:
-      - "3307:3306"  # Changed host port from 3306 to 3307 to avoid conflict
+      - "3307:3306"
     networks:
       - vuln_net
     restart: unless-stopped
@@ -24,97 +25,105 @@ services:
       timeout: 5s
       retries: 5
 
-  darkstar:
-    build:
-      context: ./darkstar
-      dockerfile: Dockerfile
-    container_name: darkstar
-    env_file:
-      - ./darkstar/.env
-    ports:
-      - "8000:8000"  # Expose the application port (adjust to your app's actual port)
-    depends_on:
-      gvmd:
-        condition: service_healthy
-      mariadb:
-        condition: service_healthy
+  # Core OpenVAS infrastructure - essential for GVM operations
+  redis-server:
+    image: registry.community.greenbone.net/community/redis-server
+    profiles: ["core", "gvm", "darkstar"]
+    restart: on-failure
+    volumes:
+      - redis_socket_vol:/run/redis/
     networks:
       - vuln_net
+
+  pg-gvm:
+    image: registry.community.greenbone.net/community/pg-gvm:stable
+    profiles: ["gvm", "darkstar"]
+    restart: on-failure
     volumes:
-      - ./darkstar:/app
-    restart: unless-stopped
-    tty: true
-    stdin_open: true
-    # Add a command that keeps the container running
-    command: tail -f /dev/null
+      - psql_data_vol:/var/lib/postgresql
+      - psql_socket_vol:/var/run/postgresql
+    networks:
+      - vuln_net
 
-
-
+  # OpenVAS data containers (these will initialize and exit)
   vulnerability-tests:
     image: registry.community.greenbone.net/community/vulnerability-tests
+    profiles: ["gvm", "darkstar"]
     environment:
       FEED_RELEASE: "24.10"
     volumes:
       - vt_data_vol:/mnt
+    networks:
+      - vuln_net
 
   notus-data:
     image: registry.community.greenbone.net/community/notus-data
+    profiles: ["gvm", "darkstar"]
     volumes:
       - notus_data_vol:/mnt
+    networks:
+      - vuln_net
 
   scap-data:
     image: registry.community.greenbone.net/community/scap-data
+    profiles: ["gvm", "darkstar"]
     volumes:
       - scap_data_vol:/mnt
+    networks:
+      - vuln_net
 
   cert-bund-data:
     image: registry.community.greenbone.net/community/cert-bund-data
+    profiles: ["gvm", "darkstar"]
     volumes:
       - cert_data_vol:/mnt
+    networks:
+      - vuln_net
 
   dfn-cert-data:
     image: registry.community.greenbone.net/community/dfn-cert-data
+    profiles: ["gvm", "darkstar"]
     volumes:
       - cert_data_vol:/mnt
     depends_on:
       - cert-bund-data
+    networks:
+      - vuln_net
 
   data-objects:
     image: registry.community.greenbone.net/community/data-objects
+    profiles: ["gvm", "darkstar"]
     environment:
       FEED_RELEASE: "24.10"
     volumes:
       - data_objects_vol:/mnt
+    networks:
+      - vuln_net
 
   report-formats:
     image: registry.community.greenbone.net/community/report-formats
+    profiles: ["gvm", "darkstar"]
     environment:
       FEED_RELEASE: "24.10"
     volumes:
       - data_objects_vol:/mnt
     depends_on:
       - data-objects
+    networks:
+      - vuln_net
 
   gpg-data:
     image: registry.community.greenbone.net/community/gpg-data
+    profiles: ["gvm", "darkstar"]
     volumes:
       - gpg_data_vol:/mnt
+    networks:
+      - vuln_net
 
-  redis-server:
-    image: registry.community.greenbone.net/community/redis-server
-    restart: on-failure
-    volumes:
-      - redis_socket_vol:/run/redis/
-
-  pg-gvm:
-    image: registry.community.greenbone.net/community/pg-gvm:stable
-    restart: on-failure
-    volumes:
-      - psql_data_vol:/var/lib/postgresql
-      - psql_socket_vol:/var/run/postgresql
-
+  # Core GVM services
   gvmd:
     image: registry.community.greenbone.net/community/gvmd:stable
+    profiles: ["gvm", "darkstar"]
     restart: on-failure
     volumes:
       - gvmd_data_vol:/var/lib/gvm
@@ -145,21 +154,13 @@ services:
       timeout: 30s
       retries: 5
       start_period: 30s
+    networks:
+      - vuln_net
 
-  gsa:
-    image: registry.community.greenbone.net/community/gsa:stable
-    restart: on-failure
-    ports:
-      - 127.0.0.1:9392:80
-    volumes:
-      - gvmd_socket_vol:/run/gvmd
-    depends_on:
-      - gvmd
-  # Sets log level of openvas to the set LOG_LEVEL within the env
-  # and changes log output to /var/log/openvas instead /var/log/gvm
-  # to reduce likelyhood of unwanted log interferences
+  # OpenVAS scanner configuration
   configure-openvas:
     image: registry.community.greenbone.net/community/openvas-scanner:stable
+    profiles: ["darkstar"]
     volumes:
       - openvas_data_vol:/mnt
       - openvas_log_data_vol:/var/log/openvas
@@ -173,30 +174,15 @@ services:
         chmod 644 /mnt/openvas_log.conf
         touch /var/log/openvas/openvas.log
         chmod 666 /var/log/openvas/openvas.log
+    networks:
+      - vuln_net
 
-  # shows logs of openvas
-  openvas:
-    image: registry.community.greenbone.net/community/openvas-scanner:stable
-    restart: on-failure
-    volumes:
-      - openvas_data_vol:/etc/openvas
-      - openvas_log_data_vol:/var/log/openvas
-    command:
-      - /bin/sh
-      - -c
-      - |
-        cat /etc/openvas/openvas.conf
-        tail -f /var/log/openvas/openvas.log
-    depends_on:
-      configure-openvas:
-        condition: service_completed_successfully
-
+  # OpenVAS scanner daemon
   openvasd:
     image: registry.community.greenbone.net/community/openvas-scanner:stable
+    profiles: ["darkstar"]
     restart: on-failure
     environment:
-      # `service_notus` is set to disable everything but notus,
-      # if you want to utilize openvasd directly, remove `OPENVASD_MODE`
       OPENVASD_MODE: service_notus
       GNUPGHOME: /etc/openvas/gnupg
       LISTENING: 0.0.0.0:80
@@ -205,9 +191,6 @@ services:
       - openvas_log_data_vol:/var/log/openvas
       - gpg_data_vol:/etc/openvas/gnupg
       - notus_data_vol:/var/lib/notus
-    # enable port forwarding when you want to use the http api from your host machine
-    # ports:
-    #   - 127.0.0.1:3000:80
     depends_on:
       vulnerability-tests:
         condition: service_completed_successfully
@@ -216,17 +199,19 @@ services:
       gpg-data:
         condition: service_completed_successfully
     networks:
-      default:
+      vuln_net:
         aliases:
           - openvasd
 
+  # OpenVAS Scanner Protocol Daemon
   ospd-openvas:
     image: registry.community.greenbone.net/community/ospd-openvas:stable
+    profiles: ["darkstar"]
     restart: on-failure
     hostname: ospd-openvas.local
     cap_add:
-      - NET_ADMIN # for capturing packages in promiscuous mode
-      - NET_RAW # for raw sockets e.g. used for the boreas alive detection
+      - NET_ADMIN
+      - NET_RAW
     security_opt:
       - seccomp=unconfined
       - apparmor=unconfined
@@ -258,28 +243,78 @@ services:
         condition: service_completed_successfully
       configure-openvas:
         condition: service_completed_successfully
+    networks:
+      - vuln_net
 
+  # OpenVAS Web Interface
+  gsa:
+    image: registry.community.greenbone.net/community/gsa:stable
+    profiles: ["gvm", "darkstar"]
+    restart: on-failure
+    ports:
+      - "9392:80"
+    volumes:
+      - gvmd_socket_vol:/run/gvmd
+    depends_on:
+      - gvmd
+    networks:
+      - vuln_net
+
+  # GVM Tools for command line access
   gvm-tools:
     image: registry.community.greenbone.net/community/gvm-tools
+    profiles: ["darkstar"]
     volumes:
       - gvmd_socket_vol:/run/gvmd
       - ospd_openvas_socket_vol:/run/ospd
     depends_on:
       - gvmd
       - ospd-openvas
+    networks:
+      - vuln_net
 
+  # Custom OpenVAS API
   openvas-api:
     build:
       context: ./openvas_api
       dockerfile: Dockerfile
     container_name: openvas-api
+    profiles: ["gvm", "darkstar"]
     ports:
       - "8008:8008"
     volumes:
       - gvmd_socket_vol:/run/gvmd 
       - ./openvas_api:/app
+    depends_on:
+      gvmd:
+        condition: service_healthy
     networks:
       - vuln_net
+
+  # Main Darkstar application
+  darkstar:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: darkstar
+    profiles: ["core", "gvm", "darkstar"]
+    working_dir: /app
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - vuln_net
+    volumes:
+      - ./darkstar:/app/darkstar
+      - ./data:/app/data
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    command: tail -f /dev/null
 
 volumes:
   mariadb_data:

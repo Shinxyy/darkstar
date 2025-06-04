@@ -1,6 +1,6 @@
 import time
 from scanners.recon import RequestsAPI, FindBreaches
-from common.db_helper import (
+from core.db_helper import (
     insert_email_data,
     insert_breached_email_data,
     insert_password_data,

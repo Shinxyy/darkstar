@@ -46,10 +46,6 @@ RUN git clone https://github.com/vanhauser-thc/thc-hydra.git /tmp/thc-hydra && \
     make && \
     make install
 
-# Prepare directory for C scripts
-WORKDIR /build
-COPY c_scripts /build/c_scripts
-RUN gcc -o /build/c_scripts/search_epss /build/c_scripts/search_epss.c
 
 # ========== FINAL RUNTIME STAGE ==========
 FROM ubuntu:22.04
@@ -68,6 +64,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone &
     apt-get update && \
     apt-get install -y --no-install-recommends \
     python3 \
+    gcc \
     python3-pip \
     pipx \
     sudo \
@@ -102,7 +99,6 @@ COPY --from=go-builder /root/.config/nuclei /root/.config/nuclei/
 COPY --from=rust-builder /usr/local/cargo/bin/rustscan /usr/local/bin/
 COPY --from=c-builder /usr/local/bin/hydra* /usr/local/bin/
 COPY --from=c-builder /usr/local/bin/xhydra /usr/local/bin/
-COPY --from=c-builder /build/c_scripts/search_epss /app/c_scripts/search_epss
 
 # Install Python tooling
 RUN pipx install bbot
@@ -112,7 +108,9 @@ COPY requirements.txt /app/
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Copy all application code in one layer
-COPY . /app/
+COPY ./darkstar /app/
+
+RUN gcc -o /app/tools/scripts/search_epss /app/tools/scripts/search_epss.c
 
 # Setup shell environment
 RUN echo 'source ~/.bashrc' > /etc/bash.bashrc && \

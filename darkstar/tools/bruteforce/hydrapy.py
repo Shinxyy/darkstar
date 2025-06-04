@@ -11,9 +11,7 @@ from typing import Optional, Dict, List, Union
 from dataclasses import dataclass
 from pathlib import Path
 import argparse
-from common.logger import setup_logger
 
-setup_logger()
 logger = logging.getLogger(__name__)
 
 
